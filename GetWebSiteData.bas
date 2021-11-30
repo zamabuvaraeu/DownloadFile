@@ -51,6 +51,61 @@ Function GetXmlHttpRequest()As IXMLHttpRequest Ptr
 
 End Function
 
+Function GetBody( _
+		ByVal pRequest As IXMLHttpRequest Ptr, _
+		byVal bstrUrl As BSTR, _
+		ByVal varBody As VARIANT Ptr _
+	)As HRESULT
+	
+	Dim varFalse As VARIANT = Any
+	With varFalse
+		.vt = VT_BOOL
+		.boolVal = VARIANT_FALSE
+	End With
+	
+	Dim varEmptyBSTR As VARIANT = Any
+	With varEmptyBSTR
+		.vt = VT_BSTR
+		.bstrVal = NULL
+	End With
+	
+	Dim hrRetValue As HRESULT = Any
+	
+	Dim bstrMethod As BSTR = SysAllocString(WStr("GET"))
+	Dim hrOpen As HRESULT = IXMLHttpRequest_Open( _
+		pRequest, _
+		bstrMethod, _
+		bstrUrl, _
+		varFalse, _
+		varEmptyBSTR, _
+		varEmptyBSTR _
+	)
+	If FAILED(hrOpen) Then
+		hrRetValue = hrOpen
+	Else
+		Dim hrSend As HRESULT = IXMLHttpRequest_Send( _
+			pRequest, _
+			varEmptyBSTR _
+		)
+		If FAILED(hrSend) Then
+			hrRetValue = hrSend
+		Else
+			Dim hrResponseBody As HRESULT = IXMLHttpRequest_get_responseBody( _
+				pRequest, _
+				varBody _
+			)
+			If FAILED(hrResponseBody) Then
+				hrRetValue = hrResponseBody
+			Else
+				hrRetValue = S_OK
+			End If
+		End If
+	End If
+	
+	Return hrRetValue
+	
+End Function
+
 Function DownloadFile( _
 		ByVal bstrUrl As BSTR, _
 		ByVal hOut As HANDLE _
@@ -62,73 +117,39 @@ Function DownloadFile( _
 	If pRequest = NULL Then
 		hrRetValue = E_OUTOFMEMORY
 	Else
-		
-		Dim varFalse As VARIANT = Any
-		With varFalse
-			.vt = VT_BOOL
-			.boolVal = VARIANT_FALSE
-		End With
-		
-		Dim varEmptyBSTR As VARIANT = Any
-		With varEmptyBSTR
-			.vt = VT_BSTR
-			.bstrVal = NULL
-		End With
-		
-		Dim bstrMethod As BSTR = SysAllocString(WStr("GET"))
-		Dim hrOpen As HRESULT = pRequest->lpVtbl->Open( _
+		Dim varBody As VARIANT = Any
+		Dim hrResponseBody As HRESULT = GetBody( _
 			pRequest, _
-			bstrMethod, _
 			bstrUrl, _
-			varFalse, _
-			varEmptyBSTR, _
-			varEmptyBSTR _
+			@varBody _
 		)
-		If FAILED(hrOpen) Then
-			hrRetValue = hrOpen
+		If FAILED(hrResponseBody) Then
+			hrRetValue = hrResponseBody
 		Else
-			Dim hrSend As HRESULT = pRequest->lpVtbl->Send( _
-				pRequest, _
-				varEmptyBSTR _
-			)
-			If FAILED(hrSend) Then
-				hrRetValue = hrSend
-			Else
-				Dim varBody As VARIANT = Any
-				Dim hrResponseBody As HRESULT = pRequest->lpVtbl->get_responseBody( _
-					pRequest, _
-					@varBody _
-				)
-				If FAILED(hrResponseBody) Then
-					hrRetValue = hrResponseBody
-				Else
-					
-					Dim pArray As UByte Ptr = Any
-					Dim hrAccessData As HRESULT = SafeArrayAccessData( _
-						varBody.parray, _
-						@pArray _
-					)
-					If FAILED(hrAccessData) Then
-						hrRetValue = hrAccessData
-					Else
-						Dim ArrayLength As Integer = varBody.parray->rgsabound(0).cElements
-						Dim NumberOfCharsWritten As DWORD = Any
-						WriteFile( _
-							hOut, _
-							pArray, _
-							Cast(DWORD, ArrayLength), _
-							@NumberOfCharsWritten, _
-							NULL _
-						)
-						SafeArrayUnaccessData(varBody.parray)
-						
-						hrRetValue = S_OK
-					End If
-				End If
-				
-			End If
 			
+			Dim pArray As UByte Ptr = Any
+			Dim hrAccessData As HRESULT = SafeArrayAccessData( _
+				varBody.parray, _
+				@pArray _
+			)
+			If FAILED(hrAccessData) Then
+				hrRetValue = hrAccessData
+			Else
+				Dim ArrayLength As Integer = varBody.parray->rgsabound(0).cElements
+				Dim NumberOfCharsWritten As DWORD = Any
+				WriteFile( _
+					hOut, _
+					pArray, _
+					Cast(DWORD, ArrayLength), _
+					@NumberOfCharsWritten, _
+					NULL _
+				)
+				SafeArrayUnaccessData(varBody.parray)
+				
+				hrRetValue = S_OK
+			End If
 		End If
+		
 	End If
 	
 	Return hrRetValue
