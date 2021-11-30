@@ -27,12 +27,7 @@ SECTIONS
 	
 	.text :
 	{
-		*(.text) *(.data) *(.rdata) *(.idata)
+		*(.text) *(.data) *(.rdata)
 	}
-	/*
-	.idata :
-	{
-		*(.idata)
-	}
-	*/
+	
 }
